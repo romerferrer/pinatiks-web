@@ -1,0 +1,31 @@
+@startuml
+left to right direction
+
+actor "System" as Sys
+actor "Admin" as Ad
+
+
+rectangle Pinatiks-Web-Admin {
+  usecase "Revisa Reservas" as UC1
+  usecase "Extiende Reserva" as UC2
+  usecase "Cancela Reserva" as UC3
+
+  usecase "Envia notificación de reserva" as UC4
+
+  usecase "Revisa Calendario" as UC5
+  usecase "Gestiona Disponibilidad" as UC6
+  usecase "Accede a Reserva" as UC7
+
+}
+
+Sys --> UC4
+
+Ad --> UC1
+UC1 <.. UC2: <<Extends>>
+UC1 <.. UC3: <<Extends>>
+
+Ad --> UC5
+UC5 <.. UC6: <<Extends>>
+UC5 <.. UC7: <<Extends>>
+
+@enduml

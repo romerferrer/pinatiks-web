@@ -1,0 +1,13 @@
+# Entornos virtuales de Python
+backend/pinatiks-backend-env/
+*.pyc
+__pycache__/
+
+# Node / React
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Variables de entorno y configuraciones locales
+.env
+.DS_Store
