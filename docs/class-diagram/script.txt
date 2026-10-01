@@ -1,0 +1,43 @@
+@startuml
+enum TimeSlot {
+     morning
+     evening
+   }
+
+class Offering {
+      id: INTEGER
+      bundle_id: INTEGER
+      --
+      name: STRING
+      slug: SLUG
+      description: STRING
+      category: String
+      active: BOOLEAN
+   }
+
+
+class OfferingImage {
+      id: INTEGER
+      offering_id: FK
+      --
+      image: IMAGE
+
+
+   }
+
+class Booking {
+      id: INTEGER
+      offering: FK
+      --
+      customer_name: STRING
+      date: DATE
+      Slot: TimeSlot
+      created_at: TIMESTAMP
+   }
+
+Booking --> TimeSlot
+Offering "1" -- "m" Booking
+Offering "1" *-- "m" OfferingImage
+Offering "1" o-- "m" Offering
+
+@enduml
