@@ -5,7 +5,7 @@ class Category(models.Model):
 
 class Offering(models.Model):
     name = models.CharField(max_length=120)
-    slug = models.SlugField(unique=True)            # shareable link
+    slug = models.SlugField(unique=True)                   # shareable link
     description = models.TextField(blank=True)
     category = models.ForeignKey(to=Category, on_delete=models.PROTECT, related_name="offerings")
     requires_booking = models.BooleanField(default=True)   # does it need a date?

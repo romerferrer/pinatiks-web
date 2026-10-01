@@ -1,5 +1,6 @@
 # Entornos virtuales de Python
 backend/pinatiks-backend-env/
+backend/env
 backend/docker-compose.yml
 *.pyc
 __pycache__/
