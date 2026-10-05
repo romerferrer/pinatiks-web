@@ -8,10 +8,11 @@ class Offering(models.Model):
     slug = models.SlugField(unique=True)                   # shareable link
     description = models.TextField(blank=True)
     category = models.ForeignKey(to=Category, on_delete=models.PROTECT, related_name="offerings")
-    requires_booking = models.BooleanField(default=True)   # does it need a date?
+    requires_booking = models.BooleanField(default=False)   # does it need a date?
     is_available = models.BooleanField(default=True)       # is she taking it now?
     items = models.ManyToManyField("self", symmetrical=False, blank=True)  # bundle contents
 
 class OfferingPhoto(models.Model):
     offering = models.ForeignKey(Offering, on_delete=models.CASCADE, related_name="photos")
     image = models.ImageField(upload_to="offerings/")
+    
