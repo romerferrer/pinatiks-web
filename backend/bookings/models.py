@@ -33,6 +33,6 @@ class Booking(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Unavailability(models.Model):
-    calendar_entry = models.OneToOneField(CalendarEntry, on_delete=models.CASCADE, related_name="booking")
+    calendar_entry = models.OneToOneField(CalendarEntry, on_delete=models.CASCADE, related_name="unavailability")
 
     

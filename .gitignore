@@ -2,6 +2,8 @@
 backend/pinatiks-backend-env/
 backend/env
 backend/docker-compose.yml
+backend/pyrightconfig.json
+backend/.vscode/
 *.pyc
 __pycache__/
 

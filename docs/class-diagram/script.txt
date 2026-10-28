@@ -1,33 +1,51 @@
 @startuml
 enum TimeSlot {
      morning
+     --
      evening
    }
 
 class Offering {
       id: INTEGER
-      bundle_id: INTEGER
+      items: FK
       --
       name: STRING
       slug: SLUG
       description: STRING
-      category: String
       active: BOOLEAN
    }
 
-
+class Category {
+      id: INTEGER
+      offering: FK
+      --
+      name: STRING
+   }
 class OfferingImage {
       id: INTEGER
       offering_id: FK
       --
       image: IMAGE
+      position: INTEGER
+      alt_text: STRING
+   }
 
-
+class Promotion {
+      id: INTEGER
+      offerings: FK
+      --
+      title: STRING
+      kind: STRING
+      description: STRING
+      featured: BOOLEAN
+      is_active: BOOLEAN
+      starts_at: DATE
+      ends_at: DATE
    }
 
 class Booking {
       id: INTEGER
-      offering: FK
+      offering_id: FK
       --
       customer_name: STRING
       date: DATE
@@ -35,9 +53,11 @@ class Booking {
       created_at: TIMESTAMP
    }
 
-Booking --> TimeSlot
+Booking <-- TimeSlot
 Offering "1" -- "m" Booking
+Offering "m" *-- "1" Category
 Offering "1" *-- "m" OfferingImage
+Offering "m" --o "n" Promotion
 Offering "1" o-- "m" Offering
 
 @enduml
