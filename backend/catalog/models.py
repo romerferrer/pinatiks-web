@@ -1,6 +1,5 @@
 from django.db import models
 from django.db.models import UniqueConstraint
-from django.utils import choices
 
 class Category(models.Model):
     name = models.TextField(null=False)
@@ -8,14 +7,21 @@ class Category(models.Model):
     def __str__(self) -> str:
         return self.name
 
+class Tag(models.Model):
+    name = models.TextField(null=False)
+
+    def __str__(self) -> str:
+        return self.name
+
 class Offering(models.Model):
     name = models.CharField(max_length=128)
-    slug = models.SlugField(unique=True)                   # shareable link
+    slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     category = models.ForeignKey(to=Category, on_delete=models.RESTRICT, related_name="offerings")
-    requires_booking = models.BooleanField(default=False)   # does it need a date?
-    is_available = models.BooleanField(default=True)       # is she taking it now?
-    items = models.ManyToManyField(to="self", symmetrical=False, blank=True, related_name="parent")  # bundle contents
+    tags = models.ManyToManyField(to=Tag, null=True)
+    requires_booking = models.BooleanField(default=False)
+    is_available = models.BooleanField(default=True)
+    items = models.ManyToManyField(to="self", symmetrical=False, null=True, related_name="parent")  # bundle contents
 
     def __str__(self) -> str:
         return f"{self.name} ({self.is_available})"

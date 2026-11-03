@@ -23,13 +23,11 @@ def validate_and_create_offering(data: dict, append_text: str) -> Offering:
     #Verify the existence of all mandatory fields
     missing_field = lacks_mandatory_fields(data, ['name', 'slug', 'category'])
     if missing_field:
-        response_message = f'Missing field {append_text}: {missing_field}'
-        raise Error
+        raise Error(f'Missing field {append_text}: {missing_field}')
                     
     category = Category.objects.filter(pk=data['category']).first()
     if not category:
-        response_message = f'Unexistent category'
-        raise Error
+        raise Error(f'Unexistent category')
 
     #Create Offering
     args = {'name':data['name'], 'slug':data['slug'], 'category':category}
@@ -38,18 +36,21 @@ def validate_and_create_offering(data: dict, append_text: str) -> Offering:
             args[field] = data[field]
     return Offering.objects.create(**args)
 
+
+
 #--------- VIEWS ---------
 #For individual offering page.
-def get_offering(request, slug: str):
+def get_offering_from_slug(request, slug: str):
     if request.method == "GET":
-        query = Offering.objects.get(slug=slug)
+        query = Offering.objects.filter(slug=slug).first()
+        if not query:
+            return JsonResponse({'status': 'error', 'message': 'No offering found'}, status=404)
         #Status OK
         return JsonResponse({'status': 'success', 'data': query}, status=200)
     else:
         return JsonResponse({'status': 'error', 'message': 'Request method not allowed for this endpoint'}, status=405)
 
-def offerings(request):
-    
+def offerings(request): 
     match request.method:
         #Arguments: page, category (optional), tags (optional)
         case "GET":
@@ -64,32 +65,38 @@ def offerings(request):
                     #Read HTTP request body
                     body: dict = json.loads(request.body)
                     
-                    offering = validate_and_create_offering(body, "in offering")
+                    offering: Offering = validate_and_create_offering(body, "in offering")
                     
+                    if 'tags' in body:
+                        for tag in body['tags']:
+                            if not isinstance(tag, str):
+                                raise Error(f'One or more tags are not in the correct format')
+                            
                     #Add Photos
                     if 'photos' in body:
                         for photo in body['photos']:
                             if not isinstance(photo,dict):
-                                response_message = f'One or more photos are not in the correct format'
-                                raise Error
+                                raise Error(f'One or more photos are not in the correct format')
                             
                             #Verificación de existencia de todos los campos requeridos
                             missing_field = lacks_mandatory_fields(photo, ['url', 'position'])
                             if missing_field:
-                                response_message = f'Missing field in photo: {missing_field}'
-                                raise Error
+                                raise Error(f'Missing field in photo: {missing_field}')
                             
                             OfferingImage.objects.create(offering=offering, image=photo["url"], position=photo["position"], alt_text=photo.get("alt_text",""))
 
                     if 'items' in body:
                         for item in body['items']:
-                            if isinstance(item, int):
-                                offering.items.add(item)
+                            if isinstance(item, str):
+                                item_query = Offering.objects.filter(slug=item).first()
+                                if not item_query:
+                                    raise Error(f'One or more items do not exist')
+                                offering.items.add(item_query)
                             elif isinstance(item, dict):
                                 child_offering = validate_and_create_offering(item, "in item")
                                 offering.items.add(child_offering)
                             else:
-                                response_message = f'One or more item ids are not in the correct format'
+                                response_message = f'One or more items are not in the correct format (slug or full declaration)'
                                 raise Error
 
                     #Status Created
@@ -100,8 +107,8 @@ def offerings(request):
                 return JsonResponse({'status': 'error', 'message': 'Provided body is not valid JSON'}, status=400)
             except IntegrityError:
                 return JsonResponse({'status': 'error', 'message': 'Data in one or more fields is not valid'}, status=400)
-            except Error:
-                return JsonResponse({'status': 'error', 'message': response_message}, status=400)
+            except Error as e:
+                return JsonResponse({'status': 'error', 'message': e.args[0]}, status=400)
 
         case _:
             return JsonResponse({'status': 'error', 'message': 'Request method not allowed for this endpoint'}, status=405)
@@ -185,3 +192,6 @@ def promotion(request, id: int):
             pass
         case _:
             return JsonResponse({'status': 'error', 'message': 'Request method not allowed for this endpoint'}, status=405)
+
+# To do:
+# Implementar tags
