@@ -3,14 +3,15 @@ import json
 from django.http import JsonResponse
 from django.db import Error, transaction, IntegrityError
 
-from .models import Offering, OfferingImage, Category
+from django.core.paginator import EmptyPage, Paginator
+
+from .models import Offering, OfferingImage, Category, Tag
 
 def lacks_mandatory_fields(object: dict, fields: list[str]) -> str | None:
     for field in fields:
         if field not in object:
             return field
     return None
-
 
 def offering_to_dict(o: Offering):
     return {
@@ -25,7 +26,7 @@ def validate_and_create_offering(data: dict, append_text: str) -> Offering:
     if missing_field:
         raise Error(f'Missing field {append_text}: {missing_field}')
                     
-    category = Category.objects.filter(pk=data['category']).first()
+    category = Category.objects.filter(name=data['category']).first()
     if not category:
         raise Error(f'Unexistent category')
 
@@ -34,9 +35,33 @@ def validate_and_create_offering(data: dict, append_text: str) -> Offering:
     for field in ["description", "is_available", "requires_booking"]:
         if field in data:
             args[field] = data[field]
-    return Offering.objects.create(**args)
+    with transaction.atomic():
+        offering = Offering.objects.create(**args)
 
+        if 'tags' in data:
+            for tag in data['tags']:
+                if not isinstance(tag, str):
+                    raise Error(f'One or more tags are not in the correct format')
 
+                tag_query = Tag.objects.filter(name=tag).first()
+                if not tag_query:
+                    raise Error(f'One or more tags do not exist')
+                
+                offering.tags.add(tag_query)
+                                
+        #Add Photos
+        if 'photos' in data:
+            for photo in data['photos']:
+                if not isinstance(photo,dict):
+                    raise Error(f'One or more photos are not in the correct format')
+                                
+                #Verificación de existencia de todos los campos requeridos
+                missing_field = lacks_mandatory_fields(photo, ['url', 'position'])
+                if missing_field:
+                    raise Error(f'Missing field in photo: {missing_field}')
+                                
+                OfferingImage.objects.create(offering=offering, image=photo["url"], position=photo["position"], alt_text=photo.get("alt_text",""))
+    return offering
 
 #--------- VIEWS ---------
 #For individual offering page.
@@ -54,36 +79,48 @@ def offerings(request):
     match request.method:
         #Arguments: page, category (optional), tags (optional)
         case "GET":
-            #Get all offerings
-            query = [offering_to_dict(offering) for offering in Offering.objects.select_related("category")]
+            query = Offering.objects.filter(is_available=True).select_related("category")
+
+            category =  request.GET.get("category")
+            if category:
+                query = query.filter(category__name=category)
+            
+            tags = set(request.GET.getlist("tag"))
+
+            if tags:
+                query = query.filter(tags__name__in=tags).distinct()
+
+            q = request.GET.get("q")
+            if q:
+                query = query.filter(name__icontains=q)
+            
+            try:
+                page_number = int(request.GET.get("page", 1))
+            except ValueError:
+                return JsonResponse({'status': 'error', 'message': 'page number has to be an integer'}, status=400)
+
+            paginator = Paginator(query,12)
+            try:
+                page = paginator.page(page_number)
+            except EmptyPage:
+                return JsonResponse({'status': 'error', 'message': 'page out of range'}, status=404)
+            
+            response = {
+                "count": paginator.count,
+                "num_pages": paginator.num_pages,
+                "page": page.number,
+                "results": [offering_to_dict(o) for o in page.object_list]
+            }
+
             #Status OK
-            return JsonResponse({'status': 'success', 'data': query}, status=200)
+            return JsonResponse({'status': 'success', 'data': response}, status=200)
         case "POST":
-            response_message: str = 'An unexpected error has occured'
             try:
                 with transaction.atomic():
                     #Read HTTP request body
                     body: dict = json.loads(request.body)
                     
                     offering: Offering = validate_and_create_offering(body, "in offering")
-                    
-                    if 'tags' in body:
-                        for tag in body['tags']:
-                            if not isinstance(tag, str):
-                                raise Error(f'One or more tags are not in the correct format')
-                            
-                    #Add Photos
-                    if 'photos' in body:
-                        for photo in body['photos']:
-                            if not isinstance(photo,dict):
-                                raise Error(f'One or more photos are not in the correct format')
-                            
-                            #Verificación de existencia de todos los campos requeridos
-                            missing_field = lacks_mandatory_fields(photo, ['url', 'position'])
-                            if missing_field:
-                                raise Error(f'Missing field in photo: {missing_field}')
-                            
-                            OfferingImage.objects.create(offering=offering, image=photo["url"], position=photo["position"], alt_text=photo.get("alt_text",""))
 
                     if 'items' in body:
                         for item in body['items']:
@@ -96,8 +133,7 @@ def offerings(request):
                                 child_offering = validate_and_create_offering(item, "in item")
                                 offering.items.add(child_offering)
                             else:
-                                response_message = f'One or more items are not in the correct format (slug or full declaration)'
-                                raise Error
+                                raise Error(f'One or more items are not in the correct format (slug or full declaration)')
 
                     #Status Created
                     return JsonResponse({'status': 'success', 'message': 'Offering sucessfully created', 'data': offering_to_dict(offering)}, status=201)
@@ -113,27 +149,38 @@ def offerings(request):
         case _:
             return JsonResponse({'status': 'error', 'message': 'Request method not allowed for this endpoint'}, status=405)
 
-def offering(request, id: int):
-    if not id:
-        return JsonResponse({'status': 'error', 'message': 'No offering id was provided'}, status=400)
+def offering(request, slug: str):
+    if not slug:
+        return JsonResponse({'status': 'error', 'message': 'No offering slug was provided'}, status=400)
     
-    offering = Offering.objects.filter(pk=id).select_related("category").first()
+    offering = Offering.objects.filter(slug=slug).select_related("category").first()
+
     if not offering:
-        return JsonResponse({'status': 'error', 'message': f'Offering {id} no found.'}, status=404)
+        return JsonResponse({'status': 'error', 'message': f'Offering "{slug}" no found.'}, status=404)
 
     match request.method:
         case "PATCH":
             try:
                 #Read HTTP request body
+                """body format:
+                    {name?,slug?,category?,description?,is_available?,requires_booking?,
+                    photos?:{
+                        operation?: add/move/delete
+                        image: url
+                        position: (int)
+                        target_position: (int)
+                        alt_text: (str)
+                        }
+                    }
+                """
                 body: dict = json.loads(request.body)
 
                 if 'category' in body:
-                    category = Category.objects.filter(pk=body['category']).first()
+                    category = Category.objects.filter(name=body['category']).first()
                     if not category:
                         return JsonResponse({'status': 'error', 'message': f'Unexistent category'}, status=400)
 
                 #Modify included fields
-                offering.pk = body.get('id', offering.pk)
                 offering.name = body.get('name', offering.name)
                 offering.slug = body.get('slug', offering.slug)
                 offering.category = body.get('category', offering.category)
@@ -143,20 +190,41 @@ def offering(request, id: int):
 
                 if "photos" in body:
                     for photo_dict in body['photos']:
-                            if not isinstance(photo_dict,dict):
-                                return JsonResponse({'status': 'error', 'message': f'UOne or more photos are not in the correct format'}, status=400)
+                            if not isinstance(photo_dict, dict):
+                                return JsonResponse({'status': 'error', 'message': f'One or more photos are not in the correct format'}, status=400)
                             
-                            if lacks_mandatory_fields(photo_dict, ["id"]):
-                                continue
+                            if lacks_mandatory_fields(photo_dict, ["position"]):
+                                return JsonResponse({'status': 'error', 'message': f'"position" parameter not specified for one or more photos'}, status=400)
                             
-                            photo = OfferingImage.objects.filter(pk=photo_dict["id"]).first()
+                            photo = offering.photos.filter(position=photo_dict["position"]).first()
                             if not photo:
-                                continue
-
-                            photo.image = photo_dict.get('url', photo.image)
-                            photo.position = photo_dict.get('position', photo.position)
+                                return JsonResponse({'status': 'error', 'message': f'One or more photos do not exist in the specified offering'}, status=400)
+                            
                             photo.alt_text = photo_dict.get('alt_text', photo.alt_text)
                             photo.save()
+
+                            match photo_dict['operation']:
+                                case 'add':
+                                    missing_field = lacks_mandatory_fields(photo_dict, ['url'])
+                                    if missing_field:
+                                        return JsonResponse({'status': 'error', 'message': f'"url" parameter not specified for one or more photos'}, status=400)
+
+                                    offering.photos.create(position=photo_dict['position'],image=photo_dict['url'],alt_text=photo_dict.get("alt_text",""))
+
+                                case 'move':
+                                    if lacks_mandatory_fields(photo_dict, ["target_position"]):
+                                        return JsonResponse({'status': 'error', 'message': f'No "target_position" set for one or more photos set to move'}, status=400)
+
+                                    photo.position = photo_dict['target_position']
+
+                                    photo_to_swap = offering.photos.filter(position=photo_dict["target_position"]).first()
+                                    if photo_to_swap:
+                                        photo_to_swap.position = photo_dict['position']
+                                        photo_to_swap.save()
+                                    photo.save()
+                                
+                                case 'delete':
+                                    photo.delete()
 
                 offering.save()
 
@@ -168,10 +236,13 @@ def offering(request, id: int):
                 return JsonResponse({'status': 'error', 'message': 'Provided body is not valid JSON'}, status=400)
             except IntegrityError:
                 return JsonResponse({'status': 'error', 'message': 'Data in one or more fields is not valid'}, status=400)
+            except:
+                return JsonResponse({'status': 'error', 'message': 'An unexpected error has occured'}, status=400)
+
         case "DELETE":
             offering.delete()
             #Status OK
-            return JsonResponse({'status': 'success', 'message': f'Offering {id} and photos deleted.'}, status=200)
+            return JsonResponse({'status': 'success', 'message': f'Offering "{slug}" and photos deleted.'}, status=200)
         case _:
             return JsonResponse({'status': 'error', 'message': 'Request method not allowed for this endpoint'}, status=405)
 
@@ -193,5 +264,5 @@ def promotion(request, id: int):
         case _:
             return JsonResponse({'status': 'error', 'message': 'Request method not allowed for this endpoint'}, status=405)
 
-# To do:
-# Implementar tags
+#To-Do:
+#Maybe validate_and_create_offering need a try-except statement for the transaction.atomic()
