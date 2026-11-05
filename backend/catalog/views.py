@@ -2,6 +2,7 @@ import json
 
 from django.http import JsonResponse
 from django.db import Error, transaction, IntegrityError
+from django.views.decorators.csrf import csrf_exempt
 
 from django.core.paginator import EmptyPage, Paginator
 
@@ -75,6 +76,7 @@ def get_offering_from_slug(request, slug: str):
     else:
         return JsonResponse({'status': 'error', 'message': 'Request method not allowed for this endpoint'}, status=405)
 
+@csrf_exempt
 def offerings(request): 
     match request.method:
         #Arguments: page, category (optional), tags (optional)
