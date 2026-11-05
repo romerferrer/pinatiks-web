@@ -1,5 +1,6 @@
 # Entornos virtuales de Python
 backend/pinatiks-backend-env/
+backend/venv
 backend/env
 backend/docker-compose.yml
 backend/pyrightconfig.json
