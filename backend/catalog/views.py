@@ -111,6 +111,8 @@ def offerings(request):
                 "count": paginator.count,
                 "num_pages": paginator.num_pages,
                 "page": page.number,
+                "has_next": page.has_next,
+                "has_previous": page.has_previous,
                 "results": [offering_to_dict(o) for o in page.object_list]
             }
 
