@@ -118,8 +118,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 USE_CLOUDINARY = bool(os.environ.get("CLOUDINARY_CLOUD_NAME"))
 
 if USE_CLOUDINARY:
-    idx = INSTALLED_APPS.index("django.contrib.staticfiles")
-    INSTALLED_APPS.insert(idx, "cloudinary_storage")
+    INSTALLED_APPS.append("cloudinary_storage")  # after django.contrib.staticfiles
     INSTALLED_APPS.append("cloudinary")
 
     CLOUDINARY_STORAGE = {
