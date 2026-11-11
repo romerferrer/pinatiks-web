@@ -66,6 +66,7 @@ class Promotion(models.Model):
     is_active = models.BooleanField(default=True)
     starts_at = models.DateField(null=True, blank=True)
     ends_at = models.DateField(null=True, blank=True)
+    image = models.ImageField(null=True, upload_to="promotions/")
     
     def __str__(self) -> str:
         return f"{self.title} ({self.kind}): {self.description[0:10]}"

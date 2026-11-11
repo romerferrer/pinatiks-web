@@ -63,14 +63,44 @@ def validate_and_create_offering(data: dict, append_text: str) -> Offering:
                                 
                 OfferingImage.objects.create(offering=offering, image=photo["url"], position=photo["position"], alt_text=photo.get("alt_text",""))
     return offering
-
+#-------------------------
 #--------- VIEWS ---------
+#-------------------------
+#Health
+def health_check():
+    return JsonResponse({"status": "ok"})
+
+#CATEGORIES
+@csrf_exempt
+def categories(request):
+    if request.method == "GET":
+        query = Category.objects.all()
+        if not query:
+            return JsonResponse({'status': 'error', 'message': 'No categories found'}, status=404)
+        #Status OK
+        return JsonResponse({'status': 'success', 'data': [category.name for category in query]}, status=200)
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Request method not allowed for this endpoint'}, status=405)
+
+#TAGS
+def tags(request):
+    if request.method == "GET":
+        query = Tag.objects.all()
+        if not query:
+            return JsonResponse({'status': 'error', 'message': 'No tags found'}, status=404)
+        #Status OK
+        return JsonResponse({'status': 'success', 'data': [tag.name for tag in query]}, status=200)
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Request method not allowed for this endpoint'}, status=405)
+
+#OFFERINGS
 #For individual offering page.
+@csrf_exempt
 def get_offering_from_slug(request, slug: str):
     if request.method == "GET":
         query = Offering.objects.filter(slug=slug).first()
         if not query:
-            return JsonResponse({'status': 'error', 'message': 'No offering found'}, status=404)
+            return JsonResponse({'status': 'error', 'message': 'No offerings found'}, status=404)
         #Status OK
         return JsonResponse({'status': 'success', 'data': query}, status=200)
     else:
@@ -96,6 +126,9 @@ def offerings(request):
             if q:
                 query = query.filter(name__icontains=q)
             
+            query = query.order_by("name")
+
+            #Pagination
             try:
                 page_number = int(request.GET.get("page", 1))
             except ValueError:
@@ -111,8 +144,8 @@ def offerings(request):
                 "count": paginator.count,
                 "num_pages": paginator.num_pages,
                 "page": page.number,
-                "has_next": page.has_next,
-                "has_previous": page.has_previous,
+                "has_next": page.has_next(),
+                "has_previous": page.has_previous(),
                 "results": [offering_to_dict(o) for o in page.object_list]
             }
 
