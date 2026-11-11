@@ -67,7 +67,7 @@ def validate_and_create_offering(data: dict, append_text: str) -> Offering:
 #--------- VIEWS ---------
 #-------------------------
 #Health
-def health_check():
+def health_check(request):
     return JsonResponse({"status": "ok"}, status=200)
 
 #CATEGORIES
