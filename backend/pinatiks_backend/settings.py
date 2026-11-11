@@ -104,6 +104,32 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# --- Media (local development) ---
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# --- Cloudinary only if the env vars exist (so local dev needs no account) ---
+USE_CLOUDINARY = bool(os.environ.get("CLOUDINARY_CLOUD_NAME"))
+
+if USE_CLOUDINARY:
+    idx = INSTALLED_APPS.index("django.contrib.staticfiles")
+    INSTALLED_APPS.insert(idx, "cloudinary_storage")
+    INSTALLED_APPS.append("cloudinary")
+
+    CLOUDINARY_STORAGE = {
+        "CLOUD_NAME": os.environ["CLOUDINARY_CLOUD_NAME"],
+        "API_KEY": os.environ["CLOUDINARY_API_KEY"],
+        "API_SECRET": os.environ["CLOUDINARY_API_SECRET"],
+    }
+    default_storage_backend = "cloudinary_storage.storage.MediaCloudinaryStorage"
+else:
+    default_storage_backend = "django.core.files.storage.FileSystemStorage"
+
+
+STORAGES = {
+    "default": {"BACKEND": default_storage_backend},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration

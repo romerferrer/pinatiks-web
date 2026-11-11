@@ -111,7 +111,7 @@ def offerings(request):
     match request.method:
         #Arguments: page, category (optional), tags (optional)
         case "GET":
-            query = Offering.objects.filter(is_available=True).select_related("category")
+            query = Offering.objects.filter(is_available=True).select_related("category").prefetch_related("photos")
 
             category =  request.GET.get("category")
             if category:
