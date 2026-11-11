@@ -68,7 +68,7 @@ def validate_and_create_offering(data: dict, append_text: str) -> Offering:
 #-------------------------
 #Health
 def health_check():
-    return JsonResponse({"status": "ok"})
+    return JsonResponse({"status": "ok"}, status=200)
 
 #CATEGORIES
 @csrf_exempt
